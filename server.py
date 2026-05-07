@@ -8,7 +8,6 @@ import os
 from urllib.parse import urlparse, parse_qs
 
 # --- DATABASE SETUP ---
-# रेंडर के लिए डेटाबेस पाथ सेट करना
 DB_PATH = "mi_downloader.db"
 
 def setup_db():
@@ -25,7 +24,7 @@ class KushagraEngineHandler(http.server.SimpleHTTPRequestHandler):
     def send_json(self, data, status=200):
         self.send_response(status)
         self.send_header("Content-type", "application/json")
-        self.send_header("Access-Control-Allow-Origin", "*") # ताकि कोई भी इसे एक्सेस कर सके
+        self.send_header("Access-Control-Allow-Origin", "*") 
         self.end_headers()
         self.wfile.write(json.dumps(data, indent=4).encode())
 
@@ -64,7 +63,7 @@ class KushagraEngineHandler(http.server.SimpleHTTPRequestHandler):
             except Exception as e:
                 self.send_json({"error": "Database error or user already exists"}, 500)
 
-        # 3. API: Video Engine
+        # 3. API: Video Engine (Error Fix Included)
         elif parsed_path.path == "/api/engine":
             key = query.get("key", [None])[0]
             video_url = query.get("url", [None])[0]
@@ -84,8 +83,20 @@ class KushagraEngineHandler(http.server.SimpleHTTPRequestHandler):
                 return
 
             try:
-                # Engine logic
-                ydl_opts = {'format': 'best', 'quiet': True, 'no_warnings': True}
+                # --- यहाँ एरर फिक्स किया गया है ---
+                ydl_opts = {
+                    'format': 'best',
+                    'quiet': True,
+                    'no_warnings': True,
+                    # Android client का उपयोग करके YouTube की पाबंदी को हटाना
+                    'extractor_args': {
+                        'youtube': {
+                            'player_client': ['android_test', 'web_embedded'],
+                        }
+                    },
+                    'user_agent': 'Mozilla/5.0 (Android 13; Mobile; rv:109.0) Gecko/114.0 Firefox/114.0'
+                }
+                
                 with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                     info = ydl.extract_info(video_url, download=False)
                 
@@ -98,16 +109,16 @@ class KushagraEngineHandler(http.server.SimpleHTTPRequestHandler):
                     "thumbnail": info.get('thumbnail')
                 })
             except Exception as e:
+                # एरर मैसेज को साफ़ तरीके से भेजना
                 self.send_json({"error": str(e)}, 500)
 
         else:
-            # बाकी Static files (CSS/JS) के लिए
             super().do_GET()
 
 # --- RENDER PORT LOGIC ---
-# Render environment variable से पोर्ट उठाता है
 PORT = int(os.environ.get("PORT", 8000))
 
-with socketserver.TCPServer(("", PORT), KushagraEngineHandler) as httpd:
+# ध्यान दें: Render पर 0.0.0.0 का उपयोग करना ज़रूरी है
+with socketserver.TCPServer(("0.0.0.0", PORT), KushagraEngineHandler) as httpd:
     print(f"🚀 Kushagra Engine is LIVE on Port: {PORT}")
     httpd.serve_forever()
