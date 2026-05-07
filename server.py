@@ -32,7 +32,7 @@ class KushagraEngineHandler(http.server.SimpleHTTPRequestHandler):
         parsed_path = urlparse(self.path)
         query = parse_qs(parsed_path.query)
 
-        # 1. Main UI (index.html)
+        # 1. Main UI
         if parsed_path.path == "/" or parsed_path.path == "/index.html":
             try:
                 with open("index.html", "rb") as f:
@@ -41,60 +41,62 @@ class KushagraEngineHandler(http.server.SimpleHTTPRequestHandler):
                     self.end_headers()
                     self.wfile.write(f.read())
             except FileNotFoundError:
-                self.send_json({"error": "index.html not found on server"}, 404)
+                self.send_json({"error": "index.html not found"}, 404)
             return
 
-        # 2. API: Register User
+        # 2. API: Register
         elif parsed_path.path == "/api/register":
             name = query.get("name", [None])[0]
             if not name:
-                self.send_json({"error": "Please provide a name!"}, 400)
+                self.send_json({"error": "Name please!"}, 400)
                 return
-            
             new_key = f"kushagra_{str(uuid.uuid4())[:8]}"
-
             try:
                 conn = sqlite3.connect(DB_PATH)
-                cursor = conn.cursor()
-                cursor.execute("INSERT INTO users (username, api_key) VALUES (?, ?)", (name, new_key))
+                c = conn.cursor()
+                c.execute("INSERT INTO users (username, api_key) VALUES (?, ?)", (name, new_key))
                 conn.commit()
                 conn.close()
-                self.send_json({"message": f"Welcome {name}!", "your_api_key": new_key})
-            except Exception as e:
-                self.send_json({"error": "Database error or user already exists"}, 500)
+                self.send_json({"your_api_key": new_key})
+            except:
+                self.send_json({"error": "DB Error"}, 500)
 
-        # 3. API: Video Engine (Error Fix Included)
+        # 3. API: Video Engine (COOKIES FIX)
         elif parsed_path.path == "/api/engine":
             key = query.get("key", [None])[0]
             video_url = query.get("url", [None])[0]
 
-            if not key or not video_url:
-                self.send_json({"error": "Missing key or url"}, 400)
-                return
-
             conn = sqlite3.connect(DB_PATH)
-            cursor = conn.cursor()
-            cursor.execute("SELECT username FROM users WHERE api_key=?", (key,))
-            user = cursor.fetchone()
+            c = conn.cursor()
+            c.execute("SELECT username FROM users WHERE api_key=?", (key,))
+            user = c.fetchone()
             conn.close()
 
             if not user:
-                self.send_json({"error": "Invalid API Key!"}, 401)
+                self.send_json({"error": "Invalid Key"}, 401)
                 return
 
             try:
-                # --- यहाँ एरर फिक्स किया गया है ---
+                # GitHub par upload ki gayi cookies.txt ko read karna
+                cookie_data = ""
+                if os.path.exists('cookies.txt'):
+                    with open('cookies.txt', 'r') as f:
+                        cookie_data = f.read().strip()
+
                 ydl_opts = {
                     'format': 'best',
                     'quiet': True,
                     'no_warnings': True,
-                    # Android client का उपयोग करके YouTube की पाबंदी को हटाना
+                    'nocheckcertificate': True,
+                    'http_headers': {
+                        'Cookie': cookie_data,
+                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+                    },
                     'extractor_args': {
                         'youtube': {
-                            'player_client': ['android_test', 'web_embedded'],
+                            'player_client': ['android', 'web', 'ios'],
                         }
-                    },
-                    'user_agent': 'Mozilla/5.0 (Android 13; Mobile; rv:109.0) Gecko/114.0 Firefox/114.0'
+                    }
                 }
                 
                 with yt_dlp.YoutubeDL(ydl_opts) as ydl:
@@ -102,23 +104,18 @@ class KushagraEngineHandler(http.server.SimpleHTTPRequestHandler):
                 
                 self.send_json({
                     "status": "success",
-                    "engine": "Kushagra Engine V3",
-                    "authorized_user": user[0],
                     "title": info.get('title'),
                     "download_url": info.get('url'),
                     "thumbnail": info.get('thumbnail')
                 })
             except Exception as e:
-                # एरर मैसेज को साफ़ तरीके से भेजना
                 self.send_json({"error": str(e)}, 500)
 
         else:
             super().do_GET()
 
-# --- RENDER PORT LOGIC ---
+# Render Port setup
 PORT = int(os.environ.get("PORT", 8000))
-
-# ध्यान दें: Render पर 0.0.0.0 का उपयोग करना ज़रूरी है
 with socketserver.TCPServer(("0.0.0.0", PORT), KushagraEngineHandler) as httpd:
-    print(f"🚀 Kushagra Engine is LIVE on Port: {PORT}")
+    print(f"🚀 Kushagra Engine LIVE on Port: {PORT}")
     httpd.serve_forever()
