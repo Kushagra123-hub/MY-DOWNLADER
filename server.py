@@ -48,7 +48,7 @@ class KushagraEngineHandler(http.server.SimpleHTTPRequestHandler):
         elif parsed_path.path == "/api/register":
             name = query.get("name", [None])[0]
             if not name:
-                self.send_json({"error": "Name please!"}, 400)
+                self.send_json({"error": "Name required!"}, 400)
                 return
             new_key = f"kushagra_{str(uuid.uuid4())[:8]}"
             try:
@@ -57,11 +57,11 @@ class KushagraEngineHandler(http.server.SimpleHTTPRequestHandler):
                 c.execute("INSERT INTO users (username, api_key) VALUES (?, ?)", (name, new_key))
                 conn.commit()
                 conn.close()
-                self.send_json({"your_api_key": new_key})
+                self.send_json({"message": f"Welcome {name}!", "your_api_key": new_key})
             except:
-                self.send_json({"error": "DB Error"}, 500)
+                self.send_json({"error": "Database error"}, 500)
 
-        # 3. API: Video Engine (COOKIES FIX)
+        # 3. API: Video Engine (ULTIMATE FIX)
         elif parsed_path.path == "/api/engine":
             key = query.get("key", [None])[0]
             video_url = query.get("url", [None])[0]
@@ -73,43 +73,54 @@ class KushagraEngineHandler(http.server.SimpleHTTPRequestHandler):
             conn.close()
 
             if not user:
-                self.send_json({"error": "Invalid Key"}, 401)
+                self.send_json({"error": "Invalid API Key!"}, 401)
                 return
 
             try:
-                # GitHub par upload ki gayi cookies.txt ko read karna
-                cookie_data = ""
+                # कुकीज़ फाइल को सुरक्षित रूप से पढ़ना
+                cookie_content = ""
                 if os.path.exists('cookies.txt'):
                     with open('cookies.txt', 'r') as f:
-                        cookie_data = f.read().strip()
+                        cookie_content = f.read().strip()
 
+                # yt-dlp के लिए सबसे एडवांस सेटिंग्स
                 ydl_opts = {
                     'format': 'best',
                     'quiet': True,
                     'no_warnings': True,
                     'nocheckcertificate': True,
+                    'ignoreerrors': True,
+                    'cookiefile': 'cookies.txt' if os.path.exists('cookies.txt') else None,
                     'http_headers': {
-                        'Cookie': cookie_data,
-                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36',
+                        'Accept': '*/*',
+                        'Accept-Language': 'en-US,en;q=0.9',
                     },
                     'extractor_args': {
                         'youtube': {
-                            'player_client': ['android', 'web', 'ios'],
+                            'player_client': ['android', 'ios', 'web'],
+                            'player_skip': ['webpage', 'configs'],
                         }
                     }
                 }
                 
                 with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                     info = ydl.extract_info(video_url, download=False)
-                
+                    
+                if not info:
+                    raise Exception("Could not extract video info. YouTube might be blocking this IP.")
+
                 self.send_json({
                     "status": "success",
+                    "engine": "Kushagra Engine V3 - Ultra",
+                    "authorized_user": user[0],
                     "title": info.get('title'),
                     "download_url": info.get('url'),
-                    "thumbnail": info.get('thumbnail')
+                    "thumbnail": info.get('thumbnail'),
+                    "duration": info.get('duration')
                 })
             except Exception as e:
-                self.send_json({"error": str(e)}, 500)
+                self.send_json({"error": f"Engine Error: {str(e)}"}, 500)
 
         else:
             super().do_GET()
