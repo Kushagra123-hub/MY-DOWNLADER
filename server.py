@@ -11,12 +11,15 @@ from urllib.parse import urlparse, parse_qs
 DB_PATH = "mi_downloader.db"
 
 def setup_db():
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-    cursor.execute('''CREATE TABLE IF NOT EXISTS users 
-                      (id INTEGER PRIMARY KEY, username TEXT, api_key TEXT UNIQUE)''')
-    conn.commit()
-    conn.close()
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+        cursor.execute('''CREATE TABLE IF NOT EXISTS users 
+                          (id INTEGER PRIMARY KEY, username TEXT, api_key TEXT UNIQUE)''')
+        conn.commit()
+        conn.close()
+    except Exception as e:
+        print(f"DB Setup Error: {e}")
 
 setup_db()
 
@@ -32,7 +35,6 @@ class KushagraEngineHandler(http.server.SimpleHTTPRequestHandler):
         parsed_path = urlparse(self.path)
         query = parse_qs(parsed_path.query)
 
-        # 1. Main UI
         if parsed_path.path == "/" or parsed_path.path == "/index.html":
             try:
                 with open("index.html", "rb") as f:
@@ -40,15 +42,14 @@ class KushagraEngineHandler(http.server.SimpleHTTPRequestHandler):
                     self.send_header("Content-type", "text/html")
                     self.end_headers()
                     self.wfile.write(f.read())
-            except FileNotFoundError:
-                self.send_json({"error": "index.html not found"}, 404)
+            except:
+                self.send_json({"error": "UI not found"}, 404)
             return
 
-        # 2. API: Register
         elif parsed_path.path == "/api/register":
             name = query.get("name", [None])[0]
             if not name:
-                self.send_json({"error": "Name required!"}, 400)
+                self.send_json({"error": "Name needed"}, 400)
                 return
             new_key = f"kushagra_{str(uuid.uuid4())[:8]}"
             try:
@@ -57,15 +58,15 @@ class KushagraEngineHandler(http.server.SimpleHTTPRequestHandler):
                 c.execute("INSERT INTO users (username, api_key) VALUES (?, ?)", (name, new_key))
                 conn.commit()
                 conn.close()
-                self.send_json({"message": f"Welcome {name}!", "your_api_key": new_key})
+                self.send_json({"your_api_key": new_key})
             except:
-                self.send_json({"error": "Database error"}, 500)
+                self.send_json({"error": "Registration failed"}, 500)
 
-        # 3. API: Video Engine (ULTIMATE FIX)
         elif parsed_path.path == "/api/engine":
             key = query.get("key", [None])[0]
             video_url = query.get("url", [None])[0]
 
+            # API Key Check
             conn = sqlite3.connect(DB_PATH)
             c = conn.cursor()
             c.execute("SELECT username FROM users WHERE api_key=?", (key,))
@@ -73,60 +74,44 @@ class KushagraEngineHandler(http.server.SimpleHTTPRequestHandler):
             conn.close()
 
             if not user:
-                self.send_json({"error": "Invalid API Key!"}, 401)
+                self.send_json({"error": "Invalid Key"}, 401)
                 return
 
             try:
-                # कुकीज़ फाइल को सुरक्षित रूप से पढ़ना
-                cookie_content = ""
-                if os.path.exists('cookies.txt'):
-                    with open('cookies.txt', 'r') as f:
-                        cookie_content = f.read().strip()
-
-                # yt-dlp के लिए सबसे एडवांस सेटिंग्स
+                # पक्का करो कि cookies.txt है या नहीं
+                cookie_path = 'cookies.txt'
+                
                 ydl_opts = {
                     'format': 'best',
                     'quiet': True,
                     'no_warnings': True,
                     'nocheckcertificate': True,
-                    'ignoreerrors': True,
-                    'cookiefile': 'cookies.txt' if os.path.exists('cookies.txt') else None,
-                    'http_headers': {
-                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36',
-                        'Accept': '*/*',
-                        'Accept-Language': 'en-US,en;q=0.9',
-                    },
+                    # अगर फाइल है तभी इस्तेमाल करो, वरना छोड़ दो
+                    'cookiefile': cookie_path if os.path.exists(cookie_path) else None,
                     'extractor_args': {
                         'youtube': {
-                            'player_client': ['android', 'ios', 'web'],
-                            'player_skip': ['webpage', 'configs'],
+                            'player_client': ['android', 'ios'],
                         }
                     }
                 }
                 
                 with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                     info = ydl.extract_info(video_url, download=False)
-                    
-                if not info:
-                    raise Exception("Could not extract video info. YouTube might be blocking this IP.")
-
+                
                 self.send_json({
                     "status": "success",
-                    "engine": "Kushagra Engine V3 - Ultra",
-                    "authorized_user": user[0],
                     "title": info.get('title'),
-                    "download_url": info.get('url'),
-                    "thumbnail": info.get('thumbnail'),
-                    "duration": info.get('duration')
+                    "download_url": info.get('url')
                 })
             except Exception as e:
-                self.send_json({"error": f"Engine Error: {str(e)}"}, 500)
+                # यहाँ हम असली एरर भेजेंगे ताकि पता चले कि क्या गड़बड़ है
+                self.send_json({"error": str(e)}, 500)
 
         else:
             super().do_GET()
 
-# Render Port setup
 PORT = int(os.environ.get("PORT", 8000))
+# "0.0.0.0" रेंडर के लिए बहुत ज़रूरी है
 with socketserver.TCPServer(("0.0.0.0", PORT), KushagraEngineHandler) as httpd:
     print(f"🚀 Kushagra Engine LIVE on Port: {PORT}")
     httpd.serve_forever()
