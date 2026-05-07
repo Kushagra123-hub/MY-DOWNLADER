@@ -3,11 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kushagra API Portal</title>
+    <title>Kushagra Engine V3 - Cloud Portal</title>
     <style>
         body {
-            background-color: #0d0d0d;
-            color: #00ffcc;
+            background-color: #0a0a0a;
+            color: #39ff14; /* Neon Green */
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             display: flex;
             flex-direction: column;
@@ -18,80 +18,99 @@
         }
 
         .container {
-            background-color: #1a1a1a;
+            background-color: #111;
             padding: 40px;
             border-radius: 15px;
-            box-shadow: 0 0 20px #00ffcc44;
+            box-shadow: 0 0 30px #39ff1433;
             text-align: center;
-            border: 1px solid #333;
-            width: 400px;
+            border: 2px solid #39ff14;
+            width: 450px;
         }
 
         h1 {
-            font-size: 24px;
-            margin-bottom: 20px;
-            letter-spacing: 2px;
+            font-size: 28px;
+            margin-bottom: 10px;
+            text-transform: uppercase;
+            letter-spacing: 3px;
+            text-shadow: 0 0 10px #39ff14;
         }
 
+        p { color: #888; margin-bottom: 25px; }
+
         input {
-            width: 80%;
-            padding: 12px;
-            margin-bottom: 20px;
-            border-radius: 5px;
-            border: 1px solid #00ffcc;
+            width: 85%;
+            padding: 15px;
+            margin-bottom: 25px;
+            border-radius: 8px;
+            border: 1px solid #39ff14;
             background: #000;
             color: #fff;
             outline: none;
+            font-size: 16px;
             text-align: center;
         }
 
         button {
-            background-color: #00ffcc;
+            background-color: #39ff14;
             color: #000;
             border: none;
-            padding: 12px 25px;
+            padding: 15px 30px;
             font-weight: bold;
-            border-radius: 5px;
+            font-size: 16px;
+            border-radius: 8px;
             cursor: pointer;
             transition: 0.3s;
+            width: 93%;
         }
 
         button:hover {
-            background-color: #00cca3;
-            box-shadow: 0 0 10px #00ffcc;
+            background-color: #32cd32;
+            box-shadow: 0 0 20px #39ff14;
+            transform: scale(1.02);
         }
 
         #resultBox {
-            margin-top: 30px;
-            padding: 15px;
+            margin-top: 35px;
+            padding: 20px;
             background: #000;
-            border-radius: 8px;
+            border: 1px dashed #39ff14;
+            border-radius: 10px;
             display: none;
-            word-break: break-all;
+            animation: fadeIn 0.5s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
         }
 
         .key-text {
-            color: #ffd700;
+            color: #ffd700; /* Gold color for Key */
             font-family: 'Consolas', monospace;
-            font-size: 18px;
+            font-size: 20px;
+            background: #1a1a1a;
+            padding: 10px;
+            display: block;
+            margin-top: 10px;
+            border-radius: 5px;
         }
     </style>
 </head>
 <body>
 
     <div class="container">
-        <h1>KUSHAGRA ENGINE API</h1>
-        <p>अपना नाम डालें और Unique Key प्राप्त करें</p>
+        <h1>KUSHAGRA ENGINE</h1>
+        <p>CLOUD API SYSTEM V3</p>
         
-        <input type="text" id="userName" placeholder="यहाँ अपना नाम लिखें...">
+        <input type="text" id="userName" placeholder="अपना नाम यहाँ लिखें...">
         <br>
-        <button onclick="generateKey()">GENERATE API KEY</button>
+        <button onclick="generateKey()">GENERATE MY API KEY</button>
 
         <div id="resultBox">
-            <p>आपकी API Key तैयार है:</p>
+            <span style="color: #fff;">आपकी Unique API Key:</span>
             <div id="keyDisplay" class="key-text"></div>
-            <p style="font-size: 12px; color: #666; margin-top: 10px;">
-                इसका उपयोग /api/engine के लिए करें
+            <p style="font-size: 12px; margin-top: 15px;">
+                Status: <span style="color: #39ff14;">ACTIVE ON CLOUD</span>
             </p>
         </div>
     </div>
@@ -103,25 +122,29 @@
             const keyDisplay = document.getElementById('keyDisplay');
 
             if (!name) {
-                alert("कृपया अपना नाम डालें!");
+                alert("भाई, नाम तो लिखो!");
                 return;
             }
 
             try {
-                // सर्वर को /api/register पर नाम भेज रहे हैं
-                // ?name=${name} ही सबसे ज़रूरी हिस्सा है
-                const response = await fetch(`http://localhost:8000/api/register?name=${encodeURIComponent(name)}`);
+                // सीधे तुम्हारे रेंडर वाले लिंक को कॉल कर रहा है
+                const response = await fetch(`https://my-downlader.onrender.com/api/register?name=${encodeURIComponent(name)}`);
+                
+                if (!response.ok) {
+                    throw new Error('Server issues');
+                }
+
                 const data = await response.json();
 
                 if (data.your_api_key) {
                     resultBox.style.display = 'block';
                     keyDisplay.innerText = data.your_api_key;
                 } else {
-                    alert("सर्वर एरर: " + data.error);
+                    alert("सर्वर ने मना कर दिया: " + data.error);
                 }
             } catch (error) {
                 console.error("Error:", error);
-                alert("सर्वर से कनेक्ट नहीं हो पा रहा! पहले server.py चलाएँ।");
+                alert("सर्वर से कनेक्शन नहीं हो पाया। शायद रेंडर 'Sleep' मोड में है, 30 सेकंड बाद फिर ट्राई करो।");
             }
         }
     </script>
