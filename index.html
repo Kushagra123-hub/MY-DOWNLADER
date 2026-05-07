@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kushagra API Portal</title>
+    <style>
+        body {
+            background-color: #0d0d0d;
+            color: #00ffcc;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+        }
+
+        .container {
+            background-color: #1a1a1a;
+            padding: 40px;
+            border-radius: 15px;
+            box-shadow: 0 0 20px #00ffcc44;
+            text-align: center;
+            border: 1px solid #333;
+            width: 400px;
+        }
+
+        h1 {
+            font-size: 24px;
+            margin-bottom: 20px;
+            letter-spacing: 2px;
+        }
+
+        input {
+            width: 80%;
+            padding: 12px;
+            margin-bottom: 20px;
+            border-radius: 5px;
+            border: 1px solid #00ffcc;
+            background: #000;
+            color: #fff;
+            outline: none;
+            text-align: center;
+        }
+
+        button {
+            background-color: #00ffcc;
+            color: #000;
+            border: none;
+            padding: 12px 25px;
+            font-weight: bold;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: 0.3s;
+        }
+
+        button:hover {
+            background-color: #00cca3;
+            box-shadow: 0 0 10px #00ffcc;
+        }
+
+        #resultBox {
+            margin-top: 30px;
+            padding: 15px;
+            background: #000;
+            border-radius: 8px;
+            display: none;
+            word-break: break-all;
+        }
+
+        .key-text {
+            color: #ffd700;
+            font-family: 'Consolas', monospace;
+            font-size: 18px;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>KUSHAGRA ENGINE API</h1>
+        <p>अपना नाम डालें और Unique Key प्राप्त करें</p>
+        
+        <input type="text" id="userName" placeholder="यहाँ अपना नाम लिखें...">
+        <br>
+        <button onclick="generateKey()">GENERATE API KEY</button>
+
+        <div id="resultBox">
+            <p>आपकी API Key तैयार है:</p>
+            <div id="keyDisplay" class="key-text"></div>
+            <p style="font-size: 12px; color: #666; margin-top: 10px;">
+                इसका उपयोग /api/engine के लिए करें
+            </p>
+        </div>
+    </div>
+
+    <script>
+        async function generateKey() {
+            const name = document.getElementById('userName').value;
+            const resultBox = document.getElementById('resultBox');
+            const keyDisplay = document.getElementById('keyDisplay');
+
+            if (!name) {
+                alert("कृपया अपना नाम डालें!");
+                return;
+            }
+
+            try {
+                // सर्वर को /api/register पर नाम भेज रहे हैं
+                // ?name=${name} ही सबसे ज़रूरी हिस्सा है
+                const response = await fetch(`http://localhost:8000/api/register?name=${encodeURIComponent(name)}`);
+                const data = await response.json();
+
+                if (data.your_api_key) {
+                    resultBox.style.display = 'block';
+                    keyDisplay.innerText = data.your_api_key;
+                } else {
+                    alert("सर्वर एरर: " + data.error);
+                }
+            } catch (error) {
+                console.error("Error:", error);
+                alert("सर्वर से कनेक्ट नहीं हो पा रहा! पहले server.py चलाएँ।");
+            }
+        }
+    </script>
+
+</body>
+</html>
